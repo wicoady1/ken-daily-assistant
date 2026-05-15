@@ -1,0 +1,37 @@
+{
+  "name": "ken-daily-assitant",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate"
+  },
+  "dependencies": {
+    "@vercel/postgres": "^0.10",
+    "dotenv": "^17.4.2",
+    "drizzle-orm": "^0.38",
+    "next": "^15",
+    "openai": "^4",
+    "pg": "^8.20.0",
+    "react": "^19",
+    "react-dom": "^19",
+    "telegraf": "^4",
+    "yaml": "^2"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.5",
+    "@types/node": "^22",
+    "@types/pg": "^8.20.0",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "drizzle-kit": "^0.30",
+    "eslint": "^10.3.0",
+    "eslint-config-next": "^16.2.6",
+    "typescript": "^5",
+    "vitest": "^4.1.6"
+  }
+}

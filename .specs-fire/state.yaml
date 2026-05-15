@@ -1,0 +1,121 @@
+project:
+  name: ken-daily-assitant
+  description: Daily reminder system with AI-powered note summarization and
+    Telegram delivery
+  created: 2026-05-15T10:00:00Z
+  fire_version: 0.1.8
+workspace:
+  type: greenfield
+  structure: monolith
+  autonomy_bias: balanced
+  run_scope_preference: single
+  run_scope_history: []
+intents:
+  - id: daily-reminder-system
+    title: Daily Reminder System
+    status: completed
+    work_items:
+      - id: project-scaffold
+        title: Project Scaffold
+        status: completed
+        complexity: low
+        mode: autopilot
+        depends_on: []
+        run_id: run-ken-daily-assitant-001
+        completed_at: 2026-05-15T03:25:39.964Z
+      - id: database-setup
+        title: Database Setup
+        status: completed
+        complexity: low
+        mode: autopilot
+        depends_on:
+          - project-scaffold
+        run_id: run-ken-daily-assitant-001
+        completed_at: 2026-05-15T03:25:39.964Z
+      - id: notes-api
+        title: Notes API
+        status: completed
+        complexity: medium
+        mode: confirm
+        depends_on:
+          - database-setup
+        run_id: run-ken-daily-assitant-002
+        completed_at: 2026-05-15T03:41:45.591Z
+      - id: notes-ui
+        title: Notes UI
+        status: completed
+        complexity: medium
+        mode: confirm
+        depends_on:
+          - notes-api
+        run_id: run-ken-daily-assitant-002
+        completed_at: 2026-05-15T03:41:45.591Z
+      - id: llm-summarization
+        title: LLM Summarization
+        status: completed
+        complexity: medium
+        mode: confirm
+        depends_on:
+          - project-scaffold
+        run_id: run-ken-daily-assitant-002
+        completed_at: 2026-05-15T03:41:45.591Z
+      - id: telegram-delivery
+        title: Telegram Delivery
+        status: completed
+        complexity: low
+        mode: autopilot
+        depends_on:
+          - project-scaffold
+        run_id: run-ken-daily-assitant-001
+        completed_at: 2026-05-15T03:25:39.964Z
+      - id: cron-scheduler
+        title: Cron Scheduler & Orchestrator
+        status: completed
+        complexity: high
+        mode: validate
+        depends_on:
+          - notes-api
+          - llm-summarization
+          - telegram-delivery
+        checkpoint_1: approved
+        run_id: run-ken-daily-assitant-003
+        completed_at: 2026-05-15T04:00:50.278Z
+runs:
+  active: []
+  completed:
+    - id: run-ken-daily-assitant-001
+      scope: batch
+      work_items:
+        - id: project-scaffold
+          intent: daily-reminder-system
+          mode: autopilot
+        - id: database-setup
+          intent: daily-reminder-system
+          mode: autopilot
+        - id: telegram-delivery
+          intent: daily-reminder-system
+          mode: autopilot
+      started: 2026-05-15T03:17:42.360Z
+      completed: 2026-05-15T03:25:39.964Z
+    - id: run-ken-daily-assitant-002
+      scope: batch
+      work_items:
+        - id: notes-api
+          intent: daily-reminder-system
+          mode: confirm
+        - id: notes-ui
+          intent: daily-reminder-system
+          mode: confirm
+        - id: llm-summarization
+          intent: daily-reminder-system
+          mode: confirm
+      started: 2026-05-15T03:30:09.054Z
+      completed: 2026-05-15T03:41:45.591Z
+    - id: run-ken-daily-assitant-003
+      scope: single
+      work_items:
+        - id: cron-scheduler
+          intent: daily-reminder-system
+          mode: validate
+      started: 2026-05-15T03:48:17.771Z
+      completed: 2026-05-15T04:00:50.278Z
