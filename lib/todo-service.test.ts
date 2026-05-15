@@ -175,7 +175,7 @@ describe("todo-service", () => {
       const { generateTodoList } = await import("./todo-service");
       const result = await generateTodoList("Payment gateway issue", "2026-05-14");
 
-      expect(mockExtractTodos).toHaveBeenCalledWith("Payment gateway issue");
+      expect(mockExtractTodos).toHaveBeenCalledWith("Payment gateway issue", ["Old pending task"]);
       expect(result.length).toBeGreaterThanOrEqual(2);
     });
 

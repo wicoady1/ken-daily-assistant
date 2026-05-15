@@ -23,7 +23,15 @@ function getClient(): OpenAI {
   });
 }
 
-function buildPrompt(rawText: string): OpenAI.Chat.Completions.ChatCompletionMessageParam[] {
+function buildPrompt(
+  rawText: string,
+  existingTitles: string[]
+): OpenAI.Chat.Completions.ChatCompletionMessageParam[] {
+  const existingBlock =
+    existingTitles.length > 0
+      ? `\n\nExisting pending to-do items from previous days (do NOT re-create these — instead, include them as new items with updated context from the notes below):\n${existingTitles.map((t) => `- ${t}`).join("\n")}\n\nIf the notes indicate a previously pending item is resolved or no longer relevant, exclude it.`
+      : "";
+
   return [
     {
       role: "system",
@@ -39,6 +47,9 @@ function buildPrompt(rawText: string): OpenAI.Chat.Completions.ChatCompletionMes
         "  Do NOT mark non-urgent items as urgent. Be selective — urgency should be rare.",
         "- Understand quick commerce context: dark stores, micro-fulfillment, last-mile delivery, inventory turnover,",
         "  supplier reliability, system uptime, rider management, pricing, promotions.",
+        "- You will be shown existing pending to-do items. Do NOT output those exact same items.",
+        "  Instead, rephrase them with fresh context from the notes if still relevant.",
+        "  If the notes indicate they are resolved, do NOT include them at all.",
         "- Return ONLY valid JSON, no other text.",
         "",
         "Response format:",
@@ -52,7 +63,7 @@ function buildPrompt(rawText: string): OpenAI.Chat.Completions.ChatCompletionMes
     },
     {
       role: "user",
-      content: `Here are my notes from yesterday. Extract the to-do items:\n\n${rawText}`,
+      content: `Here are my notes from yesterday. Extract the to-do items:\n\n${rawText}${existingBlock}`,
     },
   ];
 }
@@ -98,13 +109,16 @@ function parseResponse(content: string | null): ExtractedTodo[] {
   return items;
 }
 
-export async function extractTodos(rawText: string): Promise<ExtractedTodo[]> {
+export async function extractTodos(
+  rawText: string,
+  existingTitles: string[] = []
+): Promise<ExtractedTodo[]> {
   if (!rawText || rawText.trim().length === 0) {
     return [];
   }
 
   const client = getClient();
-  const messages = buildPrompt(rawText);
+  const messages = buildPrompt(rawText, existingTitles);
 
   const completion = await client.chat.completions.create({
     model: "deepseek-chat",

@@ -86,8 +86,6 @@ export async function generateTodoList(
   rawText: string,
   dateStr: string
 ): Promise<TodoItem[]> {
-  const newExtracted: ExtractedTodo[] = await extractTodos(rawText);
-
   const carryForwardRows = await db
     .select()
     .from(todoItems)
@@ -101,25 +99,42 @@ export async function generateTodoList(
 
   const carryForwardTitles = carryForwardRows.map((r) => r.title);
 
-  // Update carry-forward items' date to today so they won't appear in old lists
-  for (const row of carryForwardRows) {
-    await db
-      .update(todoItems)
-      .set({ date: dateStr as unknown as string })
-      .where(eq(todoItems.id, row.id));
-  }
+  // Pass old pending items to LLM so it can avoid re-creating them
+  const newExtracted: ExtractedTodo[] = await extractTodos(rawText, carryForwardTitles);
 
-  const itemsToInsert = newExtracted.filter(
-    (item) => !isDuplicate(item.title, carryForwardTitles)
-  );
+  // For each new item, check if it matches an old carry-forward item
+  for (const newItem of newExtracted) {
+    const matchIdx = carryForwardTitles.findIndex((oldTitle) =>
+      isDuplicate(newItem.title, [oldTitle])
+    );
 
-  for (const item of itemsToInsert) {
+    if (matchIdx !== -1) {
+      // New item matches an old pending item — dismiss the old one
+      await db
+        .update(todoItems)
+        .set({ status: "dismissed", updated_at: new Date() })
+        .where(eq(todoItems.id, carryForwardRows[matchIdx].id));
+    }
+
     await db.insert(todoItems).values({
       date: dateStr,
-      title: item.title,
-      is_urgent: item.is_urgent,
+      title: newItem.title,
+      is_urgent: newItem.is_urgent,
       status: "pending",
     });
+  }
+
+  // Move unmatched carry-forward items to today's date
+  for (const row of carryForwardRows) {
+    const wasMatched = newExtracted.some((newItem) =>
+      isDuplicate(newItem.title, [row.title])
+    );
+    if (!wasMatched) {
+      await db
+        .update(todoItems)
+        .set({ date: dateStr as unknown as string })
+        .where(eq(todoItems.id, row.id));
+    }
   }
 
   const allRows = await db
