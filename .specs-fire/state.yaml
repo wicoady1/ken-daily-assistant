@@ -80,6 +80,66 @@ intents:
         checkpoint_1: approved
         run_id: run-ken-daily-assitant-003
         completed_at: 2026-05-15T04:00:50.278Z
+  - id: daily-todo-list
+    title: Daily To-Do List Generator
+    status: completed
+    work_items:
+      - id: todo-db-schema
+        title: To-Do Database Schema
+        status: completed
+        complexity: low
+        mode: autopilot
+        depends_on: []
+        run_id: run-ken-daily-assitant-004
+        completed_at: 2026-05-15T05:53:03.153Z
+      - id: todo-llm-extraction
+        title: To-Do LLM Extraction
+        status: completed
+        complexity: medium
+        mode: confirm
+        depends_on: []
+        run_id: run-ken-daily-assitant-004
+        completed_at: 2026-05-15T05:53:03.153Z
+      - id: todo-service
+        title: To-Do Service Layer
+        status: completed
+        complexity: medium
+        mode: confirm
+        depends_on:
+          - todo-db-schema
+          - todo-llm-extraction
+        run_id: run-ken-daily-assitant-005
+        completed_at: 2026-05-15T05:56:36.517Z
+      - id: todo-telegram-delivery
+        title: To-Do Telegram Delivery
+        status: completed
+        complexity: low
+        mode: autopilot
+        depends_on:
+          - todo-db-schema
+        run_id: run-ken-daily-assitant-005
+        completed_at: 2026-05-15T05:56:36.517Z
+      - id: todo-telegram-callback
+        title: To-Do Telegram Callback Handler
+        status: completed
+        complexity: medium
+        mode: confirm
+        depends_on:
+          - todo-service
+          - todo-telegram-delivery
+        run_id: run-ken-daily-assitant-006
+        completed_at: 2026-05-15T06:00:56.955Z
+      - id: todo-cron-integration
+        title: To-Do Cron Integration
+        status: completed
+        complexity: high
+        mode: validate
+        depends_on:
+          - todo-service
+          - todo-telegram-delivery
+          - todo-telegram-callback
+        run_id: run-ken-daily-assitant-007
+        completed_at: 2026-05-15T06:03:42.885Z
 runs:
   active: []
   completed:
@@ -119,3 +179,41 @@ runs:
           mode: validate
       started: 2026-05-15T03:48:17.771Z
       completed: 2026-05-15T04:00:50.278Z
+    - id: run-ken-daily-assitant-004
+      scope: batch
+      work_items:
+        - id: todo-db-schema
+          intent: daily-todo-list
+          mode: autopilot
+        - id: todo-llm-extraction
+          intent: daily-todo-list
+          mode: confirm
+      started: 2026-05-15T05:46:43.290Z
+      completed: 2026-05-15T05:53:03.153Z
+    - id: run-ken-daily-assitant-005
+      scope: batch
+      work_items:
+        - id: todo-service
+          intent: daily-todo-list
+          mode: confirm
+        - id: todo-telegram-delivery
+          intent: daily-todo-list
+          mode: autopilot
+      started: 2026-05-15T05:53:07.399Z
+      completed: 2026-05-15T05:56:36.517Z
+    - id: run-ken-daily-assitant-006
+      scope: single
+      work_items:
+        - id: todo-telegram-callback
+          intent: daily-todo-list
+          mode: confirm
+      started: 2026-05-15T05:56:40.341Z
+      completed: 2026-05-15T06:00:56.955Z
+    - id: run-ken-daily-assitant-007
+      scope: single
+      work_items:
+        - id: todo-cron-integration
+          intent: daily-todo-list
+          mode: validate
+      started: 2026-05-15T06:01:04.109Z
+      completed: 2026-05-15T06:03:42.885Z

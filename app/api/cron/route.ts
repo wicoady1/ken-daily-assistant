@@ -5,6 +5,8 @@ import { notes, cronExecutions } from "@/db/schema";
 import { yesterdayWIB } from "@/lib/wib-date";
 import { summarizeNotes } from "@/lib/summarize";
 import { sendDailyReminder } from "@/lib/telegram";
+import { generateTodoList } from "@/lib/todo-service";
+import { sendTodoList } from "@/lib/telegram-todo";
 
 function isAuthorized(request: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;
@@ -66,6 +68,23 @@ async function updateExecutionStatus(
     );
 }
 
+async function sendDailyTodos(
+  noteContent: string,
+  dateStr: string
+): Promise<number> {
+  try {
+    const items = await generateTodoList(noteContent, dateStr);
+    if (items.length > 0) {
+      await sendTodoList(items, dateStr);
+      console.log(`Cron: todo list sent for ${dateStr} (${items.length} items)`);
+    }
+    return items.length;
+  } catch (err) {
+    console.error(`Cron: todo generation failed for ${dateStr}:`, err);
+    return -1;
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     if (!isAuthorized(request)) {
@@ -113,15 +132,18 @@ export async function GET(request: NextRequest) {
         followUpToday: [],
         prepareAhead: [],
       }, yesterdayDate);
+      const todoCount = await sendDailyTodos(note.content, yesterdayDate);
       await updateExecutionStatus(yesterdayDate, "completed", "summarization_failed_fallback_sent");
       console.log(`Cron: fallback sent for ${yesterdayDate}`);
       return NextResponse.json({
         status: "fallback_sent",
         date: yesterdayDate,
+        todoCount,
       });
     }
 
     await sendDailyReminder(summaryResult, yesterdayDate);
+    const todoCount = await sendDailyTodos(note.content, yesterdayDate);
     await updateExecutionStatus(yesterdayDate, "completed");
 
     console.log(`Cron: reminder sent for ${yesterdayDate}`);
@@ -130,6 +152,7 @@ export async function GET(request: NextRequest) {
       date: yesterdayDate,
       followUpCount: summaryResult.followUpToday.length,
       prepareAheadCount: summaryResult.prepareAhead.length,
+      todoCount,
     });
   } catch (err) {
     console.error("Cron: unexpected error:", err);
