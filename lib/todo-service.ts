@@ -89,6 +89,10 @@ export async function generateTodoList(
     )
     .orderBy(todoItems.created_at);
 
+  console.log(
+    `generateTodoList: ${oldPendingRows.length} old pending items, ${oldPendingRows.map((r) => r.title).join(", ") || "(none)"}`
+  );
+
   const oldTitles = oldPendingRows.map((r) => r.title);
 
   // Dismiss ALL old pending items — fresh slate
@@ -115,6 +119,8 @@ export async function generateTodoList(
       status: "pending",
     });
   }
+
+  console.log(`generateTodoList: inserted ${newExtracted.length} new items`);
 
   const allRows = await db
     .select()

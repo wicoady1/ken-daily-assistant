@@ -130,11 +130,18 @@ export async function extractTodos(
   const choice = completion.choices?.[0];
   const content = choice?.message?.content ?? null;
 
+  console.log("--- LLM to-do extraction raw output ---");
+  console.log("Existing titles:", JSON.stringify(existingTitles));
+  console.log("Raw content:", JSON.stringify(content));
+  console.log("---------------------------------------");
+
   if (completion.usage) {
     console.log(
       `LLM to-do extraction tokens: ${completion.usage.prompt_tokens} prompt + ${completion.usage.completion_tokens} completion = ${completion.usage.total_tokens} total`
     );
   }
 
-  return parseResponse(content);
+  const result = parseResponse(content);
+  console.log("Parsed items:", JSON.stringify(result));
+  return result;
 }
