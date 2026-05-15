@@ -22,8 +22,16 @@ interface TodoPayload {
   reply_markup: InlineKeyboardMarkup;
 }
 
-export function formatTodoMessage(items: TodoItem[], dateLabel: string): string {
+const MAX_MESSAGE_LENGTH = 4000;
+
+interface FormattedTodo {
+  text: string;
+  shownIds: number[]; // IDs of items actually displayed
+}
+
+export function formatTodoMessage(items: TodoItem[], dateLabel: string): FormattedTodo {
   const parts: string[] = [];
+  const shownIds: number[] = [];
 
   parts.push(`<b>✅ Daily To-Do — ${escapeHtml(dateLabel)}</b>`);
 
@@ -34,30 +42,52 @@ export function formatTodoMessage(items: TodoItem[], dateLabel: string): string 
   const pendingNormal = pending.filter((i) => !i.is_urgent);
 
   let num = 1;
+  let truncated = false;
+
+  const append = (section: TodoItem[]) => {
+    for (const item of section) {
+      const line = `${num}. ${escapeHtml(item.title)}`;
+      const candidate = parts.join("\n") + "\n" + line;
+      if (candidate.length > MAX_MESSAGE_LENGTH) {
+        truncated = true;
+        return;
+      }
+      parts.push(line);
+      shownIds.push(item.id);
+      num++;
+    }
+  };
 
   if (pendingUrgent.length > 0) {
     parts.push("");
     parts.push("<b>🔴 URGENT</b>");
-    pendingUrgent.forEach((item) => {
-      parts.push(`${num}. ${escapeHtml(item.title)}`);
-      num++;
-    });
+    append(pendingUrgent);
   }
 
-  if (pendingNormal.length > 0) {
+  if (!truncated && pendingNormal.length > 0) {
     parts.push("");
     parts.push("<b>📋 Tasks</b>");
-    pendingNormal.forEach((item) => {
-      parts.push(`${num}. ${escapeHtml(item.title)}`);
-      num++;
+    append(pendingNormal);
+  }
+
+  if (!truncated && done.length > 0) {
+    parts.push("");
+    done.forEach((item) => {
+      const line = `✓ <s>${escapeHtml(item.title)}</s>`;
+      if ((parts.join("\n") + "\n" + line).length > MAX_MESSAGE_LENGTH) {
+        truncated = true;
+        return;
+      }
+      parts.push(line);
     });
   }
 
-  if (done.length > 0) {
-    parts.push("");
-    done.forEach((item) => {
-      parts.push(`✓ <s>${escapeHtml(item.title)}</s>`);
-    });
+  if (truncated) {
+    const remaining = pending.length - shownIds.length;
+    if (remaining > 0) {
+      parts.push("");
+      parts.push(`<i>... truncated (${remaining} more items)</i>`);
+    }
   }
 
   if (pending.length === 0 && done.length === 0) {
@@ -68,11 +98,11 @@ export function formatTodoMessage(items: TodoItem[], dateLabel: string): string 
   parts.push("");
   parts.push(`<i>To-do from: ${escapeHtml(dateLabel)}</i>`);
 
-  return parts.join("\n");
+  return { text: parts.join("\n"), shownIds };
 }
 
-export function buildInlineKeyboard(items: TodoItem[]): InlineKeyboardMarkup {
-  const pending = items.filter((i) => i.status === "pending");
+export function buildInlineKeyboard(items: TodoItem[], shownIds: number[]): InlineKeyboardMarkup {
+  const pending = items.filter((i) => i.status === "pending" && shownIds.includes(i.id));
   return {
     inline_keyboard: pending.map((item, index) => [
       { text: `✓ #${index + 1} Done`, callback_data: `todo:${item.id}:done` },
@@ -105,8 +135,8 @@ export async function editTodoMessage(
   dateLabel: string,
   token: string
 ): Promise<void> {
-  const text = formatTodoMessage(items, dateLabel);
-  const reply_markup = buildInlineKeyboard(items);
+  const formatted = formatTodoMessage(items, dateLabel);
+  const reply_markup = buildInlineKeyboard(items, formatted.shownIds);
 
   const res = await fetch(`https://api.telegram.org/bot${token}/editMessageText`, {
     method: "POST",
@@ -114,7 +144,7 @@ export async function editTodoMessage(
     body: JSON.stringify({
       chat_id: chatId,
       message_id: messageId,
-      text,
+      text: formatted.text,
       parse_mode: "HTML",
       reply_markup,
     }),
@@ -147,9 +177,9 @@ export async function sendTodoList(
 
   const label =
     dateLabel ?? new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
-  const text = formatTodoMessage(items, label);
-  const reply_markup = buildInlineKeyboard(items);
-  const payload: TodoPayload = { text, parse_mode: "HTML", reply_markup };
+  const formatted = formatTodoMessage(items, label);
+  const reply_markup = buildInlineKeyboard(items, formatted.shownIds);
+  const payload: TodoPayload = { text: formatted.text, parse_mode: "HTML", reply_markup };
 
   const res = await sendTelegram(token, chatId, payload);
 

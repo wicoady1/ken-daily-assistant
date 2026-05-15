@@ -148,9 +148,10 @@ describe("sendTodoList", () => {
         makeItem({ id: 2, title: "Review inventory", is_urgent: false }),
       ];
       const result = formatTodoMessage(items, "2026-05-14");
-      expect(result).toContain("1. Fix gateway");
-      expect(result).toContain("2. Review inventory");
-      expect(result).not.toContain("•");
+      expect(result.text).toContain("1. Fix gateway");
+      expect(result.text).toContain("2. Review inventory");
+      expect(result.text).not.toContain("•");
+      expect(result.shownIds).toEqual([1, 2]);
     });
 
     it("numbers items sequentially across sections", async () => {
@@ -161,9 +162,9 @@ describe("sendTodoList", () => {
         makeItem({ id: 3, title: "Another normal", is_urgent: false }),
       ];
       const result = formatTodoMessage(items, "2026-05-14");
-      expect(result).toContain("1. Urgent task");
-      expect(result).toContain("2. Normal task");
-      expect(result).toContain("3. Another normal");
+      expect(result.text).toContain("1. Urgent task");
+      expect(result.text).toContain("2. Normal task");
+      expect(result.text).toContain("3. Another normal");
     });
   });
 
@@ -174,7 +175,7 @@ describe("sendTodoList", () => {
         makeItem({ id: 10, title: "First", is_urgent: false }),
         makeItem({ id: 20, title: "Second", is_urgent: false }),
       ];
-      const keyboard = buildInlineKeyboard(items);
+      const keyboard = buildInlineKeyboard(items, [10, 20]);
 
       expect(keyboard.inline_keyboard[0][0].text).toBe("✓ #1 Done");
       expect(keyboard.inline_keyboard[0][1].text).toBe("✕ #1 Dismiss");
@@ -187,10 +188,22 @@ describe("sendTodoList", () => {
       const items = [
         makeItem({ id: 42, title: "Task", is_urgent: false }),
       ];
-      const keyboard = buildInlineKeyboard(items);
+      const keyboard = buildInlineKeyboard(items, [42]);
 
       expect(keyboard.inline_keyboard[0][0].callback_data).toBe("todo:42:done");
       expect(keyboard.inline_keyboard[0][1].callback_data).toBe("todo:42:dismiss");
+    });
+
+    it("only includes buttons for shownIds", async () => {
+      const { buildInlineKeyboard } = await import("./telegram-todo");
+      const items = [
+        makeItem({ id: 1, title: "Shown", is_urgent: false }),
+        makeItem({ id: 2, title: "Not shown", is_urgent: false }),
+      ];
+      const keyboard = buildInlineKeyboard(items, [1]);
+
+      expect(keyboard.inline_keyboard).toHaveLength(1);
+      expect(keyboard.inline_keyboard[0][0].callback_data).toBe("todo:1:done");
     });
   });
 });
