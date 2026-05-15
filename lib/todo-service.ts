@@ -12,15 +12,6 @@ export interface TodoItem {
   created_at: Date;
 }
 
-function normalizeTitle(title: string): string {
-  return title.toLowerCase().trim().replace(/[.!?,;:]+$/, "");
-}
-
-function isDuplicate(title: string, existingTitles: string[]): boolean {
-  const normalized = normalizeTitle(title);
-  return existingTitles.some((t) => normalizeTitle(t) === normalized);
-}
-
 export async function markDone(id: number): Promise<void> {
   await db
     .update(todoItems)
@@ -86,7 +77,8 @@ export async function generateTodoList(
   rawText: string,
   dateStr: string
 ): Promise<TodoItem[]> {
-  const carryForwardRows = await db
+  // Get titles of old pending items to pass as context to LLM
+  const oldPendingRows = await db
     .select()
     .from(todoItems)
     .where(
@@ -97,44 +89,31 @@ export async function generateTodoList(
     )
     .orderBy(todoItems.created_at);
 
-  const carryForwardTitles = carryForwardRows.map((r) => r.title);
+  const oldTitles = oldPendingRows.map((r) => r.title);
 
-  // Pass old pending items to LLM so it can avoid re-creating them
-  const newExtracted: ExtractedTodo[] = await extractTodos(rawText, carryForwardTitles);
-
-  // For each new item, check if it matches an old carry-forward item
-  for (const newItem of newExtracted) {
-    const matchIdx = carryForwardTitles.findIndex((oldTitle) =>
-      isDuplicate(newItem.title, [oldTitle])
-    );
-
-    if (matchIdx !== -1) {
-      // New item matches an old pending item — dismiss the old one
-      await db
-        .update(todoItems)
-        .set({ status: "dismissed", updated_at: new Date() })
-        .where(eq(todoItems.id, carryForwardRows[matchIdx].id));
-    }
-
-    await db.insert(todoItems).values({
-      date: dateStr,
-      title: newItem.title,
-      is_urgent: newItem.is_urgent,
-      status: "pending",
-    });
+  // Dismiss ALL old pending items — fresh slate
+  if (oldPendingRows.length > 0) {
+    await db
+      .update(todoItems)
+      .set({ status: "dismissed", updated_at: new Date() })
+      .where(
+        and(
+          eq(todoItems.status, "pending"),
+          lt(todoItems.date, dateStr)
+        )
+      );
   }
 
-  // Move unmatched carry-forward items to today's date
-  for (const row of carryForwardRows) {
-    const wasMatched = newExtracted.some((newItem) =>
-      isDuplicate(newItem.title, [row.title])
-    );
-    if (!wasMatched) {
-      await db
-        .update(todoItems)
-        .set({ date: dateStr as unknown as string })
-        .where(eq(todoItems.id, row.id));
-    }
+  // Let LLM generate fresh list, informed by old pending context
+  const newExtracted: ExtractedTodo[] = await extractTodos(rawText, oldTitles);
+
+  for (const item of newExtracted) {
+    await db.insert(todoItems).values({
+      date: dateStr,
+      title: item.title,
+      is_urgent: item.is_urgent,
+      status: "pending",
+    });
   }
 
   const allRows = await db
