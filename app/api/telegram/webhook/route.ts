@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { markDone, markDismissed, getTodoItem, getTodosForDate } from "@/lib/todo-service";
+import { markDone, markDismissed, getTodoItem, getAllTodosForDate } from "@/lib/todo-service";
 import { editTodoMessage } from "@/lib/telegram-todo";
 
 interface CallbackData {
@@ -35,14 +35,13 @@ async function reloadTodoMessage(
   messageId: number,
   itemId: number
 ): Promise<void> {
-  try {
-    const updatedItem = await getTodoItem(itemId);
-    if (!updatedItem) return;
-    const remaining = await getTodosForDate(updatedItem.date);
-    await editTodoMessage(chatId, messageId, remaining, updatedItem.date, token);
-  } catch (err) {
-    console.error("Failed to reload todo message:", err);
+  const updatedItem = await getTodoItem(itemId);
+  if (!updatedItem) {
+    console.error("reloadTodoMessage: item not found", itemId);
+    return;
   }
+  const allItems = await getAllTodosForDate(updatedItem.date);
+  await editTodoMessage(chatId, messageId, allItems, updatedItem.date, token);
 }
 
 export async function POST(request: NextRequest) {
@@ -72,13 +71,21 @@ export async function POST(request: NextRequest) {
     if (action === "done") {
       await markDone(id);
       if (chatId && messageId) {
-        await reloadTodoMessage(token, chatId, messageId, id);
+        try {
+          await reloadTodoMessage(token, chatId, messageId, id);
+        } catch (err) {
+          console.error("reloadTodoMessage failed:", err);
+        }
       }
       await answerCallbackQuery(token, callbackQuery.id, "✅ Marked as done");
     } else if (action === "dismiss") {
       await markDismissed(id);
       if (chatId && messageId) {
-        await reloadTodoMessage(token, chatId, messageId, id);
+        try {
+          await reloadTodoMessage(token, chatId, messageId, id);
+        } catch (err) {
+          console.error("reloadTodoMessage failed:", err);
+        }
       }
       await answerCallbackQuery(token, callbackQuery.id, "✕ Dismissed");
     }

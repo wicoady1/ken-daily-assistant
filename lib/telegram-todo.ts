@@ -27,30 +27,40 @@ export function formatTodoMessage(items: TodoItem[], dateLabel: string): string 
 
   parts.push(`<b>✅ Daily To-Do — ${escapeHtml(dateLabel)}</b>`);
 
-  const urgentItems = items.filter((i) => i.is_urgent);
-  const normalItems = items.filter((i) => !i.is_urgent);
+  const pending = items.filter((i) => i.status === "pending");
+  const done = items.filter((i) => i.status === "done");
+
+  const pendingUrgent = pending.filter((i) => i.is_urgent);
+  const pendingNormal = pending.filter((i) => !i.is_urgent);
 
   let num = 1;
 
-  if (urgentItems.length > 0) {
+  if (pendingUrgent.length > 0) {
     parts.push("");
     parts.push("<b>🔴 URGENT</b>");
-    urgentItems.forEach((item) => {
+    pendingUrgent.forEach((item) => {
       parts.push(`${num}. ${escapeHtml(item.title)}`);
       num++;
     });
   }
 
-  if (normalItems.length > 0) {
+  if (pendingNormal.length > 0) {
     parts.push("");
     parts.push("<b>📋 Tasks</b>");
-    normalItems.forEach((item) => {
+    pendingNormal.forEach((item) => {
       parts.push(`${num}. ${escapeHtml(item.title)}`);
       num++;
     });
   }
 
-  if (items.length === 0) {
+  if (done.length > 0) {
+    parts.push("");
+    done.forEach((item) => {
+      parts.push(`✓ <s>${escapeHtml(item.title)}</s>`);
+    });
+  }
+
+  if (pending.length === 0 && done.length === 0) {
     parts.push("");
     parts.push("No pending tasks. 🎉");
   }
@@ -62,8 +72,9 @@ export function formatTodoMessage(items: TodoItem[], dateLabel: string): string 
 }
 
 export function buildInlineKeyboard(items: TodoItem[]): InlineKeyboardMarkup {
+  const pending = items.filter((i) => i.status === "pending");
   return {
-    inline_keyboard: items.map((item, index) => [
+    inline_keyboard: pending.map((item, index) => [
       { text: `✓ #${index + 1} Done`, callback_data: `todo:${item.id}:done` },
       { text: `✕ #${index + 1} Dismiss`, callback_data: `todo:${item.id}:dismiss` },
     ]),
@@ -97,7 +108,7 @@ export async function editTodoMessage(
   const text = formatTodoMessage(items, dateLabel);
   const reply_markup = buildInlineKeyboard(items);
 
-  await fetch(`https://api.telegram.org/bot${token}/editMessageText`, {
+  const res = await fetch(`https://api.telegram.org/bot${token}/editMessageText`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -108,6 +119,16 @@ export async function editTodoMessage(
       reply_markup,
     }),
   });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    console.error(`editMessageText failed: ${res.status} ${JSON.stringify(body)}`);
+    throw new Error(
+      `Telegram editMessageText error: ${res.status} ${JSON.stringify(body)}`
+    );
+  }
+
+  console.log(`Todo message edited: ${messageId} (${items.length} items)`);
 }
 
 export async function sendTodoList(

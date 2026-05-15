@@ -26,10 +26,14 @@ vi.mock("./extract-todos", () => ({
 
 function setupSelect(result: unknown[]) {
   mockOrderBy.mockReturnValue(Promise.resolve(result));
-  mockWhere.mockImplementation(() => ({
-    orderBy: mockOrderBy,
-    limit: () => Promise.resolve(result),
-  }));
+  mockWhere.mockImplementation(() => {
+    const obj: any = {
+      orderBy: mockOrderBy,
+      limit: () => Promise.resolve(result),
+    };
+    obj.then = (resolve: (v: unknown) => void) => resolve(undefined);
+    return obj;
+  });
   mockFrom.mockReturnValue({ where: mockWhere });
   mockSelect.mockReturnValue({ from: mockFrom });
 }
@@ -99,6 +103,23 @@ describe("todo-service", () => {
     });
   });
 
+  describe("getAllTodosForDate", () => {
+    it("returns both pending and done items", async () => {
+      const items = [
+        { id: 1, date: "2026-05-14", title: "Pending task", is_urgent: false, status: "pending", created_at: new Date() },
+        { id: 2, date: "2026-05-14", title: "Done task", is_urgent: true, status: "done", created_at: new Date() },
+      ];
+      setupSelect(items);
+
+      const { getAllTodosForDate } = await import("./todo-service");
+      const result = await getAllTodosForDate("2026-05-14");
+
+      expect(result).toHaveLength(2);
+      expect(result[0].status).toBe("pending");
+      expect(result[1].status).toBe("done");
+    });
+  });
+
   describe("getTodoItem", () => {
     it("returns item by id", async () => {
       const item = { id: 1, date: "2026-05-14", title: "Test task", is_urgent: true, status: "pending", created_at: new Date() };
@@ -122,6 +143,17 @@ describe("todo-service", () => {
     });
   });
 
+  function setupSelectThenable(results: unknown[]) {
+    mockOrderBy.mockReturnValue(Promise.resolve(results));
+    mockWhere.mockImplementation(() => {
+      const obj: any = { orderBy: mockOrderBy };
+      obj.then = (resolve: (v: unknown) => void) => resolve(undefined);
+      return obj;
+    });
+    mockFrom.mockReturnValue({ where: mockWhere });
+    mockSelect.mockReturnValue({ from: mockFrom });
+  }
+
   describe("generateTodoList", () => {
     it("generates list with new items and carry-forward", async () => {
       mockExtractTodos.mockResolvedValue([
@@ -129,21 +161,16 @@ describe("todo-service", () => {
         { title: "Review inventory", is_urgent: false },
       ]);
 
-      const carryForwardItems = [
-        { id: 1, date: "2026-05-13", title: "Old pending task", is_urgent: false, status: "pending", created_at: new Date() },
-      ];
-
-      const newSavedItems = [
+      const finalItems = [
+        { id: 1, date: "2026-05-14", title: "Old pending task", is_urgent: false, status: "pending", created_at: new Date() },
         { id: 2, date: "2026-05-14", title: "Fix payment gateway", is_urgent: true, status: "pending", created_at: new Date() },
         { id: 3, date: "2026-05-14", title: "Review inventory", is_urgent: false, status: "pending", created_at: new Date() },
       ];
 
       mockOrderBy
-        .mockReturnValueOnce(Promise.resolve(carryForwardItems))
-        .mockReturnValueOnce(Promise.resolve(newSavedItems));
-      mockWhere.mockReturnValue({ orderBy: mockOrderBy });
-      mockFrom.mockReturnValue({ where: mockWhere });
-      mockSelect.mockReturnValue({ from: mockFrom });
+        .mockReturnValueOnce(Promise.resolve([{ id: 1, date: "2026-05-13", title: "Old pending task", is_urgent: false, status: "pending", created_at: new Date() }]))
+        .mockReturnValueOnce(Promise.resolve(finalItems));
+      setupSelectThenable([]);
 
       const { generateTodoList } = await import("./todo-service");
       const result = await generateTodoList("Payment gateway issue", "2026-05-14");
@@ -158,20 +185,15 @@ describe("todo-service", () => {
         { title: "Brand new task", is_urgent: true },
       ]);
 
-      const carryForwardItems = [
-        { id: 1, date: "2026-05-13", title: "Old pending task", is_urgent: false, status: "pending", created_at: new Date() },
-      ];
-
-      const newSavedItems = [
+      const finalItems = [
+        { id: 1, date: "2026-05-14", title: "Old pending task", is_urgent: false, status: "pending", created_at: new Date() },
         { id: 2, date: "2026-05-14", title: "Brand new task", is_urgent: true, status: "pending", created_at: new Date() },
       ];
 
       mockOrderBy
-        .mockReturnValueOnce(Promise.resolve(carryForwardItems))
-        .mockReturnValueOnce(Promise.resolve(newSavedItems));
-      mockWhere.mockReturnValue({ orderBy: mockOrderBy });
-      mockFrom.mockReturnValue({ where: mockWhere });
-      mockSelect.mockReturnValue({ from: mockFrom });
+        .mockReturnValueOnce(Promise.resolve([{ id: 1, date: "2026-05-13", title: "Old pending task", is_urgent: false, status: "pending", created_at: new Date() }]))
+        .mockReturnValueOnce(Promise.resolve(finalItems));
+      setupSelectThenable([]);
 
       const { generateTodoList } = await import("./todo-service");
       const result = await generateTodoList("Tasks", "2026-05-14");
@@ -184,16 +206,14 @@ describe("todo-service", () => {
     it("returns only carry-forward when no new items extracted", async () => {
       mockExtractTodos.mockResolvedValue([]);
 
-      const carryForwardItems = [
-        { id: 1, date: "2026-05-13", title: "Old pending task", is_urgent: true, status: "pending", created_at: new Date() },
+      const finalItems = [
+        { id: 1, date: "2026-05-14", title: "Old pending task", is_urgent: true, status: "pending", created_at: new Date() },
       ];
 
       mockOrderBy
-        .mockReturnValueOnce(Promise.resolve(carryForwardItems))
-        .mockReturnValueOnce(Promise.resolve([]));
-      mockWhere.mockReturnValue({ orderBy: mockOrderBy });
-      mockFrom.mockReturnValue({ where: mockWhere });
-      mockSelect.mockReturnValue({ from: mockFrom });
+        .mockReturnValueOnce(Promise.resolve([{ id: 1, date: "2026-05-13", title: "Old pending task", is_urgent: true, status: "pending", created_at: new Date() }]))
+        .mockReturnValueOnce(Promise.resolve(finalItems));
+      setupSelectThenable([]);
 
       const { generateTodoList } = await import("./todo-service");
       const result = await generateTodoList("", "2026-05-14");

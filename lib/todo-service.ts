@@ -35,6 +35,17 @@ export async function markDismissed(id: number): Promise<void> {
     .where(eq(todoItems.id, id));
 }
 
+function mapRow(r: typeof todoItems.$inferSelect): TodoItem {
+  return {
+    id: r.id,
+    date: r.date,
+    title: r.title,
+    is_urgent: r.is_urgent,
+    status: r.status as TodoItem["status"],
+    created_at: r.created_at!,
+  };
+}
+
 export async function getTodosForDate(dateStr: string): Promise<TodoItem[]> {
   const rows = await db
     .select()
@@ -47,14 +58,17 @@ export async function getTodosForDate(dateStr: string): Promise<TodoItem[]> {
     )
     .orderBy(todoItems.is_urgent, todoItems.created_at);
 
-  return rows.map((r) => ({
-    id: r.id,
-    date: r.date,
-    title: r.title,
-    is_urgent: r.is_urgent,
-    status: r.status as TodoItem["status"],
-    created_at: r.created_at!,
-  }));
+  return rows.map(mapRow);
+}
+
+export async function getAllTodosForDate(dateStr: string): Promise<TodoItem[]> {
+  const rows = await db
+    .select()
+    .from(todoItems)
+    .where(eq(todoItems.date, dateStr))
+    .orderBy(todoItems.is_urgent, todoItems.created_at);
+
+  return rows.map(mapRow);
 }
 
 export async function getTodoItem(id: number): Promise<TodoItem | null> {
@@ -65,14 +79,7 @@ export async function getTodoItem(id: number): Promise<TodoItem | null> {
     .limit(1);
   const row = rows[0];
   if (!row) return null;
-  return {
-    id: row.id,
-    date: row.date,
-    title: row.title,
-    is_urgent: row.is_urgent,
-    status: row.status as TodoItem["status"],
-    created_at: row.created_at!,
-  };
+  return mapRow(row);
 }
 
 export async function generateTodoList(
@@ -94,6 +101,14 @@ export async function generateTodoList(
 
   const carryForwardTitles = carryForwardRows.map((r) => r.title);
 
+  // Update carry-forward items' date to today so they won't appear in old lists
+  for (const row of carryForwardRows) {
+    await db
+      .update(todoItems)
+      .set({ date: dateStr as unknown as string })
+      .where(eq(todoItems.id, row.id));
+  }
+
   const itemsToInsert = newExtracted.filter(
     (item) => !isDuplicate(item.title, carryForwardTitles)
   );
@@ -107,7 +122,7 @@ export async function generateTodoList(
     });
   }
 
-  const newSaved = await db
+  const allRows = await db
     .select()
     .from(todoItems)
     .where(
@@ -118,24 +133,7 @@ export async function generateTodoList(
     )
     .orderBy(todoItems.is_urgent, todoItems.created_at);
 
-  const allItems = [
-    ...carryForwardRows.map((r) => ({
-      id: r.id,
-      date: r.date,
-      title: r.title,
-      is_urgent: r.is_urgent,
-      status: r.status as TodoItem["status"],
-      created_at: r.created_at!,
-    })),
-    ...newSaved.map((r) => ({
-      id: r.id,
-      date: r.date,
-      title: r.title,
-      is_urgent: r.is_urgent,
-      status: r.status as TodoItem["status"],
-      created_at: r.created_at!,
-    })),
-  ];
+  const allItems = allRows.map(mapRow);
 
   allItems.sort((a, b) => {
     if (a.is_urgent !== b.is_urgent) return a.is_urgent ? -1 : 1;
