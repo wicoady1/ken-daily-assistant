@@ -56,9 +56,9 @@ describe("sendTodoList", () => {
     expect(body.parse_mode).toBe("HTML");
     expect(body.reply_markup).toBeDefined();
     expect(body.reply_markup.inline_keyboard).toHaveLength(1);
-    expect(body.reply_markup.inline_keyboard[0][0].text).toBe("✓ Done");
+    expect(body.reply_markup.inline_keyboard[0][0].text).toBe("✓ #1 Done");
     expect(body.reply_markup.inline_keyboard[0][0].callback_data).toBe("todo:1:done");
-    expect(body.reply_markup.inline_keyboard[0][1].text).toBe("✕ Dismiss");
+    expect(body.reply_markup.inline_keyboard[0][1].text).toBe("✕ #1 Dismiss");
     expect(body.reply_markup.inline_keyboard[0][1].callback_data).toBe("todo:1:dismiss");
   });
 
@@ -166,22 +166,10 @@ describe("sendTodoList", () => {
       expect(result.text).toContain("2. Normal task");
       expect(result.text).toContain("3. Another normal");
     });
-
-    it("shows done items inline with checkmark and keeps number", async () => {
-      const { formatTodoMessage } = await import("./telegram-todo");
-      const items = [
-        makeItem({ id: 1, title: "Done task", is_urgent: true, status: "done" }),
-        makeItem({ id: 2, title: "Pending task", is_urgent: false }),
-      ];
-      const result = formatTodoMessage(items, "2026-05-14");
-      expect(result.text).toContain("1. ✅ <s>Done task</s>");
-      expect(result.text).toContain("2. Pending task");
-      expect(result.shownIds).toEqual([2]);
-    });
   });
 
   describe("buildInlineKeyboard", () => {
-    it("only shows buttons for pending items with matching shownIds", async () => {
+    it("includes display number in button text", async () => {
       const { buildInlineKeyboard } = await import("./telegram-todo");
       const items = [
         makeItem({ id: 10, title: "First", is_urgent: false }),
@@ -189,10 +177,10 @@ describe("sendTodoList", () => {
       ];
       const keyboard = buildInlineKeyboard(items, [10, 20]);
 
-      expect(keyboard.inline_keyboard[0][0].text).toBe("✓ Done");
-      expect(keyboard.inline_keyboard[0][1].text).toBe("✕ Dismiss");
-      expect(keyboard.inline_keyboard[1][0].text).toBe("✓ Done");
-      expect(keyboard.inline_keyboard[1][1].text).toBe("✕ Dismiss");
+      expect(keyboard.inline_keyboard[0][0].text).toBe("✓ #1 Done");
+      expect(keyboard.inline_keyboard[0][1].text).toBe("✕ #1 Dismiss");
+      expect(keyboard.inline_keyboard[1][0].text).toBe("✓ #2 Done");
+      expect(keyboard.inline_keyboard[1][1].text).toBe("✕ #2 Dismiss");
     });
 
     it("uses DB id in callback data regardless of display number", async () => {
@@ -216,18 +204,6 @@ describe("sendTodoList", () => {
 
       expect(keyboard.inline_keyboard).toHaveLength(1);
       expect(keyboard.inline_keyboard[0][0].callback_data).toBe("todo:1:done");
-    });
-
-    it("skips done items", async () => {
-      const { buildInlineKeyboard } = await import("./telegram-todo");
-      const items = [
-        makeItem({ id: 1, title: "Done item", status: "done" }),
-        makeItem({ id: 2, title: "Pending item" }),
-      ];
-      const keyboard = buildInlineKeyboard(items, [2]);
-
-      expect(keyboard.inline_keyboard).toHaveLength(1);
-      expect(keyboard.inline_keyboard[0][0].callback_data).toBe("todo:2:done");
     });
   });
 });

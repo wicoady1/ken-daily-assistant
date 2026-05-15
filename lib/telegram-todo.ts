@@ -35,51 +35,57 @@ export function formatTodoMessage(items: TodoItem[], dateLabel: string): Formatt
 
   parts.push(`<b>✅ Daily To-Do — ${escapeHtml(dateLabel)}</b>`);
 
-  const urgent = items.filter((i) => i.is_urgent);
-  const normal = items.filter((i) => !i.is_urgent);
+  const pending = items.filter((i) => i.status === "pending");
+  const done = items.filter((i) => i.status === "done");
+
+  const pendingUrgent = pending.filter((i) => i.is_urgent);
+  const pendingNormal = pending.filter((i) => !i.is_urgent);
 
   let num = 1;
   let truncated = false;
 
   const append = (section: TodoItem[]) => {
     for (const item of section) {
-      const prefix = item.status === "done" ? "✅ " : "";
-      const body = item.status === "done" ? `<s>${escapeHtml(item.title)}</s>` : escapeHtml(item.title);
-      const line = `${num}. ${prefix}${body}`;
+      const line = `${num}. ${escapeHtml(item.title)}`;
       const candidate = parts.join("\n") + "\n" + line;
       if (candidate.length > MAX_MESSAGE_LENGTH) {
         truncated = true;
         return;
       }
       parts.push(line);
-      if (item.status !== "done") {
-        shownIds.push(item.id);
-      }
+      shownIds.push(item.id);
       num++;
     }
   };
 
-  if (urgent.length > 0) {
+  if (pendingUrgent.length > 0) {
     parts.push("");
     parts.push("<b>🔴 URGENT</b>");
-    append(urgent);
+    append(pendingUrgent);
   }
 
-  if (!truncated && normal.length > 0) {
+  if (!truncated && pendingNormal.length > 0) {
     parts.push("");
     parts.push("<b>📋 Tasks</b>");
-    append(normal);
+    append(pendingNormal);
   }
 
   if (truncated) {
-    const remaining = items.length - (num - 1);
+    const remaining = pending.length - shownIds.length;
     if (remaining > 0) {
       parts.push("");
       parts.push(`<i>... truncated (${remaining} more items)</i>`);
     }
   }
 
-  if (items.length === 0) {
+  if (!truncated && done.length > 0) {
+    parts.push("");
+    done.forEach((item) => {
+      parts.push(`✓ <s>${escapeHtml(item.title)}</s>`);
+    });
+  }
+
+  if (pending.length === 0 && done.length === 0) {
     parts.push("");
     parts.push("No pending tasks. 🎉");
   }
@@ -93,9 +99,9 @@ export function formatTodoMessage(items: TodoItem[], dateLabel: string): Formatt
 export function buildInlineKeyboard(items: TodoItem[], shownIds: number[]): InlineKeyboardMarkup {
   const pending = items.filter((i) => i.status === "pending" && shownIds.includes(i.id));
   return {
-    inline_keyboard: pending.map((item) => [
-      { text: "✓ Done", callback_data: `todo:${item.id}:done` },
-      { text: "✕ Dismiss", callback_data: `todo:${item.id}:dismiss` },
+    inline_keyboard: pending.map((item, index) => [
+      { text: `✓ #${index + 1} Done`, callback_data: `todo:${item.id}:done` },
+      { text: `✕ #${index + 1} Dismiss`, callback_data: `todo:${item.id}:dismiss` },
     ]),
   };
 }
