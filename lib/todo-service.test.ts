@@ -155,56 +155,75 @@ describe("todo-service", () => {
   }
 
   describe("generateTodoList", () => {
-    it("dismisses old pending items and generates fresh list", async () => {
+    it("carries forward old items and adds new non-duplicate items", async () => {
       mockExtractTodos.mockResolvedValue([
         { title: "Fix payment gateway", is_urgent: true },
         { title: "Review inventory", is_urgent: false },
       ]);
 
-      const newItems = [
+      const finalItems = [
+        { id: 1, date: "2026-05-14", title: "Old pending task", is_urgent: false, status: "pending", created_at: new Date() },
         { id: 2, date: "2026-05-14", title: "Fix payment gateway", is_urgent: true, status: "pending", created_at: new Date() },
         { id: 3, date: "2026-05-14", title: "Review inventory", is_urgent: false, status: "pending", created_at: new Date() },
       ];
 
       mockOrderBy
         .mockReturnValueOnce(Promise.resolve([{ id: 1, date: "2026-05-13", title: "Old pending task", is_urgent: false, status: "pending", created_at: new Date() }]))
-        .mockReturnValueOnce(Promise.resolve(newItems));
+        .mockReturnValueOnce(Promise.resolve(finalItems));
       setupSelectThenable([]);
 
       const { generateTodoList } = await import("./todo-service");
       const result = await generateTodoList("Payment gateway issue", "2026-05-14");
 
       expect(mockExtractTodos).toHaveBeenCalledWith("Payment gateway issue", ["Old pending task"]);
-      expect(result).toHaveLength(2);
-      expect(result.map((i: { title: string }) => i.title)).toEqual([
-        "Fix payment gateway",
-        "Review inventory",
-      ]);
+      expect(result).toHaveLength(3);
     });
 
-    it("passes old titles to LLM then generates fresh list", async () => {
+    it("skips inserting new items that duplicate old pending titles", async () => {
       mockExtractTodos.mockResolvedValue([
+        { title: "Old pending task", is_urgent: false },
         { title: "Brand new task", is_urgent: true },
       ]);
 
-      const newItems = [
+      const finalItems = [
+        { id: 1, date: "2026-05-14", title: "Old pending task", is_urgent: false, status: "pending", created_at: new Date() },
         { id: 2, date: "2026-05-14", title: "Brand new task", is_urgent: true, status: "pending", created_at: new Date() },
       ];
 
       mockOrderBy
         .mockReturnValueOnce(Promise.resolve([{ id: 1, date: "2026-05-13", title: "Old pending task", is_urgent: false, status: "pending", created_at: new Date() }]))
-        .mockReturnValueOnce(Promise.resolve(newItems));
+        .mockReturnValueOnce(Promise.resolve(finalItems));
       setupSelectThenable([]);
 
       const { generateTodoList } = await import("./todo-service");
       const result = await generateTodoList("Tasks", "2026-05-14");
 
-      expect(mockExtractTodos).toHaveBeenCalledWith("Tasks", ["Old pending task"]);
-      expect(result).toHaveLength(1);
-      expect(result[0].title).toBe("Brand new task");
+      // Old pending task appears once (carried forward, not duplicated by new extraction)
+      const titles = result.map((i: { title: string }) => i.title);
+      expect(titles.filter((t: string) => t === "Old pending task")).toHaveLength(1);
+      expect(titles).toContain("Brand new task");
     });
 
-    it("returns empty when no items extracted and no old items", async () => {
+    it("returns only old items when no new items extracted", async () => {
+      mockExtractTodos.mockResolvedValue([]);
+
+      const finalItems = [
+        { id: 1, date: "2026-05-14", title: "Old pending task", is_urgent: true, status: "pending", created_at: new Date() },
+      ];
+
+      mockOrderBy
+        .mockReturnValueOnce(Promise.resolve([{ id: 1, date: "2026-05-13", title: "Old pending task", is_urgent: true, status: "pending", created_at: new Date() }]))
+        .mockReturnValueOnce(Promise.resolve(finalItems));
+      setupSelectThenable([]);
+
+      const { generateTodoList } = await import("./todo-service");
+      const result = await generateTodoList("", "2026-05-14");
+
+      expect(result).toHaveLength(1);
+      expect(result[0].title).toBe("Old pending task");
+    });
+
+    it("returns empty when no old items and no new items", async () => {
       mockExtractTodos.mockResolvedValue([]);
 
       mockOrderBy
