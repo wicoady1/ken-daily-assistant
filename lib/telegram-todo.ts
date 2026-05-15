@@ -36,7 +36,6 @@ export function formatTodoMessage(items: TodoItem[], dateLabel: string): Formatt
   parts.push(`<b>✅ Daily To-Do — ${escapeHtml(dateLabel)}</b>`);
 
   const pending = items.filter((i) => i.status === "pending");
-  const done = items.filter((i) => i.status === "done");
 
   const pendingUrgent = pending.filter((i) => i.is_urgent);
   const pendingNormal = pending.filter((i) => !i.is_urgent);
@@ -70,18 +69,6 @@ export function formatTodoMessage(items: TodoItem[], dateLabel: string): Formatt
     append(pendingNormal);
   }
 
-  if (!truncated && done.length > 0) {
-    parts.push("");
-    done.forEach((item) => {
-      const line = `✓ <s>${escapeHtml(item.title)}</s>`;
-      if ((parts.join("\n") + "\n" + line).length > MAX_MESSAGE_LENGTH) {
-        truncated = true;
-        return;
-      }
-      parts.push(line);
-    });
-  }
-
   if (truncated) {
     const remaining = pending.length - shownIds.length;
     if (remaining > 0) {
@@ -90,7 +77,7 @@ export function formatTodoMessage(items: TodoItem[], dateLabel: string): Formatt
     }
   }
 
-  if (pending.length === 0 && done.length === 0) {
+  if (pending.length === 0) {
     parts.push("");
     parts.push("No pending tasks. 🎉");
   }

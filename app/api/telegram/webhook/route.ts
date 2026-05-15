@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { markDone, markDismissed, getTodoItem, getAllTodosForDate } from "@/lib/todo-service";
+import { markDone, markDismissed, getTodoItem, getTodosForDate } from "@/lib/todo-service";
 import { editTodoMessage } from "@/lib/telegram-todo";
 
 interface CallbackData {
@@ -40,7 +40,7 @@ async function reloadTodoMessage(
     console.error("reloadTodoMessage: item not found", itemId);
     return;
   }
-  const allItems = await getAllTodosForDate(updatedItem.date);
+  const allItems = await getTodosForDate(updatedItem.date);
   await editTodoMessage(chatId, messageId, allItems, updatedItem.date, token);
 }
 
