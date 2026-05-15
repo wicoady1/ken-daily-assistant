@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { todoItems } from "@/db/schema";
-import { eq, and, lt, lte } from "drizzle-orm";
+import { eq, and, lt, lte, desc } from "drizzle-orm";
 import { extractTodos, type ExtractedTodo } from "./extract-todos";
 
 export interface TodoItem {
@@ -47,7 +47,7 @@ export async function getTodosForDate(dateStr: string): Promise<TodoItem[]> {
         eq(todoItems.status, "pending")
       )
     )
-    .orderBy(todoItems.is_urgent, todoItems.created_at);
+    .orderBy(desc(todoItems.is_urgent), todoItems.created_at);
 
   return rows.map(mapRow);
 }
@@ -57,7 +57,7 @@ export async function getAllTodosForDate(dateStr: string): Promise<TodoItem[]> {
     .select()
     .from(todoItems)
     .where(eq(todoItems.date, dateStr))
-    .orderBy(todoItems.is_urgent, todoItems.created_at);
+    .orderBy(desc(todoItems.is_urgent), todoItems.created_at);
 
   return rows.map(mapRow);
 }
@@ -131,7 +131,7 @@ export async function generateTodoList(
         eq(todoItems.status, "pending")
       )
     )
-    .orderBy(todoItems.is_urgent, todoItems.created_at);
+    .orderBy(desc(todoItems.is_urgent), todoItems.created_at);
 
   const allItems = allRows.map(mapRow);
 
