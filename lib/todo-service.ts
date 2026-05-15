@@ -91,31 +91,29 @@ export async function generateTodoList(
 
   const oldTitles = oldPendingRows.map((r) => r.title);
 
-  // Let LLM generate new items, aware of old pending ones
-  const newExtracted: ExtractedTodo[] = await extractTodos(rawText, oldTitles);
-
-  // Insert only genuinely new items (not matching old pending ones)
-  for (const item of newExtracted) {
-    // Note: type imports inside loop are fine, they're hoisted
-    const isAlreadyPending = oldTitles.some(
-      (oldTitle) => oldTitle.toLowerCase().trim() === item.title.toLowerCase().trim()
-    );
-    if (!isAlreadyPending) {
-      await db.insert(todoItems).values({
-        date: dateStr,
-        title: item.title,
-        is_urgent: item.is_urgent,
-        status: "pending",
-      });
-    }
-  }
-
-  // Move old pending items to today's date (carry forward)
-  for (const row of oldPendingRows) {
+  // Dismiss ALL old pending items — fresh slate
+  if (oldPendingRows.length > 0) {
     await db
       .update(todoItems)
-      .set({ date: dateStr as unknown as string })
-      .where(eq(todoItems.id, row.id));
+      .set({ status: "dismissed", updated_at: new Date() })
+      .where(
+        and(
+          eq(todoItems.status, "pending"),
+          lt(todoItems.date, dateStr)
+        )
+      );
+  }
+
+  // Let LLM generate fresh list, informed by old pending context
+  const newExtracted: ExtractedTodo[] = await extractTodos(rawText, oldTitles);
+
+  for (const item of newExtracted) {
+    await db.insert(todoItems).values({
+      date: dateStr,
+      title: item.title,
+      is_urgent: item.is_urgent,
+      status: "pending",
+    });
   }
 
   const allRows = await db

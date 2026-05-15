@@ -29,7 +29,7 @@ function buildPrompt(
 ): OpenAI.Chat.Completions.ChatCompletionMessageParam[] {
   const existingBlock =
     existingTitles.length > 0
-      ? `\n\nExisting pending to-do items from previous days (these carry forward automatically — only extract NEW tasks from the notes below, do NOT duplicate these):\n${existingTitles.map((t) => `- ${t}`).join("\n")}`
+      ? `\n\nYour PREVIOUS pending to-do list:\n${existingTitles.map((t) => `- ${t}`).join("\n")}\n\nGenerate an updated to-do list that includes items from the previous list (updated with new context) plus any new tasks from the notes below.`
       : "";
 
   return [
@@ -47,8 +47,10 @@ function buildPrompt(
         "  Do NOT mark non-urgent items as urgent. Be selective — urgency should be rare.",
         "- Understand quick commerce context: dark stores, micro-fulfillment, last-mile delivery, inventory turnover,",
         "  supplier reliability, system uptime, rider management, pricing, promotions.",
-        "- You will be shown existing pending to-do items (these will carry forward automatically).",
-        "  Do NOT output items that duplicate them. Only extract NEW tasks from the notes.",
+        "- You will be shown existing pending to-do items from previous days.",
+        "  Your output MUST include these items (rephrase/update them based on new notes if relevant).",
+        "  Only omit an old item if the new notes explicitly state it is resolved or done.",
+        "  Then add any additional NEW tasks extracted from the notes.",
         "- Return ONLY valid JSON, no other text.",
         "",
         "Response format:",

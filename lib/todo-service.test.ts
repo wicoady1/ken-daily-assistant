@@ -155,16 +155,17 @@ describe("todo-service", () => {
   }
 
   describe("generateTodoList", () => {
-    it("carries forward old items and adds new non-duplicate items", async () => {
+    it("dismisses old items and regenerates from LLM with old context", async () => {
       mockExtractTodos.mockResolvedValue([
+        { title: "Old pending task", is_urgent: false },
         { title: "Fix payment gateway", is_urgent: true },
         { title: "Review inventory", is_urgent: false },
       ]);
 
       const finalItems = [
-        { id: 1, date: "2026-05-14", title: "Old pending task", is_urgent: false, status: "pending", created_at: new Date() },
-        { id: 2, date: "2026-05-14", title: "Fix payment gateway", is_urgent: true, status: "pending", created_at: new Date() },
-        { id: 3, date: "2026-05-14", title: "Review inventory", is_urgent: false, status: "pending", created_at: new Date() },
+        { id: 2, date: "2026-05-14", title: "Old pending task", is_urgent: false, status: "pending", created_at: new Date() },
+        { id: 3, date: "2026-05-14", title: "Fix payment gateway", is_urgent: true, status: "pending", created_at: new Date() },
+        { id: 4, date: "2026-05-14", title: "Review inventory", is_urgent: false, status: "pending", created_at: new Date() },
       ];
 
       mockOrderBy
@@ -179,15 +180,15 @@ describe("todo-service", () => {
       expect(result).toHaveLength(3);
     });
 
-    it("skips inserting new items that duplicate old pending titles", async () => {
+    it("LLM regenerates previous items with new context", async () => {
       mockExtractTodos.mockResolvedValue([
-        { title: "Old pending task", is_urgent: false },
-        { title: "Brand new task", is_urgent: true },
+        { title: "Updated version of old task", is_urgent: true },
+        { title: "Brand new task", is_urgent: false },
       ]);
 
       const finalItems = [
-        { id: 1, date: "2026-05-14", title: "Old pending task", is_urgent: false, status: "pending", created_at: new Date() },
-        { id: 2, date: "2026-05-14", title: "Brand new task", is_urgent: true, status: "pending", created_at: new Date() },
+        { id: 2, date: "2026-05-14", title: "Updated version of old task", is_urgent: true, status: "pending", created_at: new Date() },
+        { id: 3, date: "2026-05-14", title: "Brand new task", is_urgent: false, status: "pending", created_at: new Date() },
       ];
 
       mockOrderBy
@@ -196,38 +197,18 @@ describe("todo-service", () => {
       setupSelectThenable([]);
 
       const { generateTodoList } = await import("./todo-service");
-      const result = await generateTodoList("Tasks", "2026-05-14");
+      const result = await generateTodoList("Notes", "2026-05-14");
 
-      // Old pending task appears once (carried forward, not duplicated by new extraction)
-      const titles = result.map((i: { title: string }) => i.title);
-      expect(titles.filter((t: string) => t === "Old pending task")).toHaveLength(1);
-      expect(titles).toContain("Brand new task");
+      expect(mockExtractTodos).toHaveBeenCalledWith("Notes", ["Old pending task"]);
+      expect(result).toHaveLength(2);
+      expect(result[0].title).toBe("Updated version of old task");
     });
 
-    it("returns only old items when no new items extracted", async () => {
+    it("returns empty when LLM generates nothing", async () => {
       mockExtractTodos.mockResolvedValue([]);
-
-      const finalItems = [
-        { id: 1, date: "2026-05-14", title: "Old pending task", is_urgent: true, status: "pending", created_at: new Date() },
-      ];
 
       mockOrderBy
         .mockReturnValueOnce(Promise.resolve([{ id: 1, date: "2026-05-13", title: "Old pending task", is_urgent: true, status: "pending", created_at: new Date() }]))
-        .mockReturnValueOnce(Promise.resolve(finalItems));
-      setupSelectThenable([]);
-
-      const { generateTodoList } = await import("./todo-service");
-      const result = await generateTodoList("", "2026-05-14");
-
-      expect(result).toHaveLength(1);
-      expect(result[0].title).toBe("Old pending task");
-    });
-
-    it("returns empty when no old items and no new items", async () => {
-      mockExtractTodos.mockResolvedValue([]);
-
-      mockOrderBy
-        .mockReturnValueOnce(Promise.resolve([]))
         .mockReturnValueOnce(Promise.resolve([]));
       setupSelectThenable([]);
 
