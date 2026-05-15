@@ -12,7 +12,9 @@ export function yesterdayWIB(): string {
   const wibNow = new Date(
     now.toLocaleString("en-US", { timeZone: "Asia/Jakarta" })
   );
-  wibNow.setDate(wibNow.getDate() - 1);
+  const day = wibNow.getDay();
+  const daysToSubtract = day === 1 ? 3 : day === 0 ? 2 : day === 6 ? 1 : 1;
+  wibNow.setDate(wibNow.getDate() - daysToSubtract);
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Jakarta",
     year: "numeric",
