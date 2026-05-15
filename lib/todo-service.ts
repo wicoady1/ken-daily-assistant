@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { todoItems } from "@/db/schema";
-import { eq, and, lt } from "drizzle-orm";
+import { eq, and, lt, lte } from "drizzle-orm";
 import { extractTodos, type ExtractedTodo } from "./extract-todos";
 
 export interface TodoItem {
@@ -84,7 +84,7 @@ export async function generateTodoList(
     .where(
       and(
         eq(todoItems.status, "pending"),
-        lt(todoItems.date, dateStr)
+        lte(todoItems.date, dateStr)
       )
     )
     .orderBy(todoItems.created_at);
@@ -95,7 +95,7 @@ export async function generateTodoList(
 
   const oldTitles = oldPendingRows.map((r) => r.title);
 
-  // Dismiss ALL old pending items — fresh slate
+  // Dismiss ALL old pending items — fresh slate (including same-date from previous runs)
   if (oldPendingRows.length > 0) {
     await db
       .update(todoItems)
@@ -103,7 +103,7 @@ export async function generateTodoList(
       .where(
         and(
           eq(todoItems.status, "pending"),
-          lt(todoItems.date, dateStr)
+          lte(todoItems.date, dateStr)
         )
       );
   }
