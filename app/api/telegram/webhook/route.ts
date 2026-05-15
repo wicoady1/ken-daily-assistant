@@ -53,10 +53,14 @@ export async function POST(request: NextRequest) {
     }
 
     const update = await request.json();
+    console.log("Webhook received:", JSON.stringify(update).slice(0, 500));
+
     const callbackQuery = update?.callback_query;
     if (!callbackQuery) {
       return NextResponse.json({ ok: true });
     }
+
+    console.log(`Webhook callback: data="${callbackQuery.data}", msg_id=${callbackQuery.message?.message_id}, chat_id=${callbackQuery.message?.chat?.id}`);
 
     const parsed = parseCallbackData(callbackQuery.data);
     if (!parsed) {
