@@ -22,7 +22,7 @@ interface TodoPayload {
   reply_markup: InlineKeyboardMarkup;
 }
 
-function formatTodoMessage(items: TodoItem[], dateLabel: string): string {
+export function formatTodoMessage(items: TodoItem[], dateLabel: string): string {
   const parts: string[] = [];
 
   parts.push(`<b>✅ Daily To-Do — ${escapeHtml(dateLabel)}</b>`);
@@ -30,11 +30,14 @@ function formatTodoMessage(items: TodoItem[], dateLabel: string): string {
   const urgentItems = items.filter((i) => i.is_urgent);
   const normalItems = items.filter((i) => !i.is_urgent);
 
+  let num = 1;
+
   if (urgentItems.length > 0) {
     parts.push("");
     parts.push("<b>🔴 URGENT</b>");
     urgentItems.forEach((item) => {
-      parts.push(`• ${escapeHtml(item.title)}`);
+      parts.push(`${num}. ${escapeHtml(item.title)}`);
+      num++;
     });
   }
 
@@ -42,7 +45,8 @@ function formatTodoMessage(items: TodoItem[], dateLabel: string): string {
     parts.push("");
     parts.push("<b>📋 Tasks</b>");
     normalItems.forEach((item) => {
-      parts.push(`• ${escapeHtml(item.title)}`);
+      parts.push(`${num}. ${escapeHtml(item.title)}`);
+      num++;
     });
   }
 
@@ -57,11 +61,11 @@ function formatTodoMessage(items: TodoItem[], dateLabel: string): string {
   return parts.join("\n");
 }
 
-function buildInlineKeyboard(items: TodoItem[]): InlineKeyboardMarkup {
+export function buildInlineKeyboard(items: TodoItem[]): InlineKeyboardMarkup {
   return {
-    inline_keyboard: items.map((item) => [
-      { text: "✓ Done", callback_data: `todo:${item.id}:done` },
-      { text: "✕ Dismiss", callback_data: `todo:${item.id}:dismiss` },
+    inline_keyboard: items.map((item, index) => [
+      { text: `✓ #${index + 1} Done`, callback_data: `todo:${item.id}:done` },
+      { text: `✕ #${index + 1} Dismiss`, callback_data: `todo:${item.id}:dismiss` },
     ]),
   };
 }
@@ -79,6 +83,29 @@ async function sendTelegram(
       text: payload.text,
       parse_mode: payload.parse_mode,
       reply_markup: payload.reply_markup,
+    }),
+  });
+}
+
+export async function editTodoMessage(
+  chatId: string | number,
+  messageId: number,
+  items: TodoItem[],
+  dateLabel: string,
+  token: string
+): Promise<void> {
+  const text = formatTodoMessage(items, dateLabel);
+  const reply_markup = buildInlineKeyboard(items);
+
+  await fetch(`https://api.telegram.org/bot${token}/editMessageText`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chat_id: chatId,
+      message_id: messageId,
+      text,
+      parse_mode: "HTML",
+      reply_markup,
     }),
   });
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { markDone, markDismissed } from "@/lib/todo-service";
+import { markDone, markDismissed, getTodoItem, getTodosForDate } from "@/lib/todo-service";
+import { editTodoMessage } from "@/lib/telegram-todo";
 
 interface CallbackData {
   id: number;
@@ -28,6 +29,22 @@ async function answerCallbackQuery(
   });
 }
 
+async function reloadTodoMessage(
+  token: string,
+  chatId: number,
+  messageId: number,
+  itemId: number
+): Promise<void> {
+  try {
+    const updatedItem = await getTodoItem(itemId);
+    if (!updatedItem) return;
+    const remaining = await getTodosForDate(updatedItem.date);
+    await editTodoMessage(chatId, messageId, remaining, updatedItem.date, token);
+  } catch (err) {
+    console.error("Failed to reload todo message:", err);
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -49,12 +66,20 @@ export async function POST(request: NextRequest) {
     }
 
     const { id, action } = parsed;
+    const chatId = callbackQuery.message?.chat?.id;
+    const messageId = callbackQuery.message?.message_id;
 
     if (action === "done") {
       await markDone(id);
+      if (chatId && messageId) {
+        await reloadTodoMessage(token, chatId, messageId, id);
+      }
       await answerCallbackQuery(token, callbackQuery.id, "✅ Marked as done");
     } else if (action === "dismiss") {
       await markDismissed(id);
+      if (chatId && messageId) {
+        await reloadTodoMessage(token, chatId, messageId, id);
+      }
       await answerCallbackQuery(token, callbackQuery.id, "✕ Dismissed");
     }
 

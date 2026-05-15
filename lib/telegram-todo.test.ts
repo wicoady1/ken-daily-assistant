@@ -56,9 +56,9 @@ describe("sendTodoList", () => {
     expect(body.parse_mode).toBe("HTML");
     expect(body.reply_markup).toBeDefined();
     expect(body.reply_markup.inline_keyboard).toHaveLength(1);
-    expect(body.reply_markup.inline_keyboard[0][0].text).toBe("✓ Done");
+    expect(body.reply_markup.inline_keyboard[0][0].text).toBe("✓ #1 Done");
     expect(body.reply_markup.inline_keyboard[0][0].callback_data).toBe("todo:1:done");
-    expect(body.reply_markup.inline_keyboard[0][1].text).toBe("✕ Dismiss");
+    expect(body.reply_markup.inline_keyboard[0][1].text).toBe("✕ #1 Dismiss");
     expect(body.reply_markup.inline_keyboard[0][1].callback_data).toBe("todo:1:dismiss");
   });
 
@@ -138,5 +138,59 @@ describe("sendTodoList", () => {
     await sendTodoList([makeItem({ id: 1 })], "2026-05-14");
 
     expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  describe("formatTodoMessage", () => {
+    it("uses numbered list instead of bullets", async () => {
+      const { formatTodoMessage } = await import("./telegram-todo");
+      const items = [
+        makeItem({ id: 1, title: "Fix gateway", is_urgent: true }),
+        makeItem({ id: 2, title: "Review inventory", is_urgent: false }),
+      ];
+      const result = formatTodoMessage(items, "2026-05-14");
+      expect(result).toContain("1. Fix gateway");
+      expect(result).toContain("2. Review inventory");
+      expect(result).not.toContain("•");
+    });
+
+    it("numbers items sequentially across sections", async () => {
+      const { formatTodoMessage } = await import("./telegram-todo");
+      const items = [
+        makeItem({ id: 1, title: "Urgent task", is_urgent: true }),
+        makeItem({ id: 2, title: "Normal task", is_urgent: false }),
+        makeItem({ id: 3, title: "Another normal", is_urgent: false }),
+      ];
+      const result = formatTodoMessage(items, "2026-05-14");
+      expect(result).toContain("1. Urgent task");
+      expect(result).toContain("2. Normal task");
+      expect(result).toContain("3. Another normal");
+    });
+  });
+
+  describe("buildInlineKeyboard", () => {
+    it("includes display number in button text", async () => {
+      const { buildInlineKeyboard } = await import("./telegram-todo");
+      const items = [
+        makeItem({ id: 10, title: "First", is_urgent: false }),
+        makeItem({ id: 20, title: "Second", is_urgent: false }),
+      ];
+      const keyboard = buildInlineKeyboard(items);
+
+      expect(keyboard.inline_keyboard[0][0].text).toBe("✓ #1 Done");
+      expect(keyboard.inline_keyboard[0][1].text).toBe("✕ #1 Dismiss");
+      expect(keyboard.inline_keyboard[1][0].text).toBe("✓ #2 Done");
+      expect(keyboard.inline_keyboard[1][1].text).toBe("✕ #2 Dismiss");
+    });
+
+    it("uses DB id in callback data regardless of display number", async () => {
+      const { buildInlineKeyboard } = await import("./telegram-todo");
+      const items = [
+        makeItem({ id: 42, title: "Task", is_urgent: false }),
+      ];
+      const keyboard = buildInlineKeyboard(items);
+
+      expect(keyboard.inline_keyboard[0][0].callback_data).toBe("todo:42:done");
+      expect(keyboard.inline_keyboard[0][1].callback_data).toBe("todo:42:dismiss");
+    });
   });
 });

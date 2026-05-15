@@ -57,6 +57,24 @@ export async function getTodosForDate(dateStr: string): Promise<TodoItem[]> {
   }));
 }
 
+export async function getTodoItem(id: number): Promise<TodoItem | null> {
+  const rows = await db
+    .select()
+    .from(todoItems)
+    .where(eq(todoItems.id, id))
+    .limit(1);
+  const row = rows[0];
+  if (!row) return null;
+  return {
+    id: row.id,
+    date: row.date,
+    title: row.title,
+    is_urgent: row.is_urgent,
+    status: row.status as TodoItem["status"],
+    created_at: row.created_at!,
+  };
+}
+
 export async function generateTodoList(
   rawText: string,
   dateStr: string

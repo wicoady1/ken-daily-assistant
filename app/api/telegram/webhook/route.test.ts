@@ -1,23 +1,48 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+const mockSelect = vi.fn();
+const mockWhere = vi.fn();
+const mockLimit = vi.fn();
+const mockOrderBy = vi.fn();
+const mockSet = vi.fn();
+const mockFrom = vi.fn();
+
 vi.mock("@vercel/postgres", () => ({ sql: {} }));
 vi.mock("@/db", () => ({
   db: {
+    select: mockSelect,
     update: () => ({
-      set: () => ({
-        where: () => Promise.resolve(undefined),
-      }),
+      set: mockSet,
     }),
   },
 }));
 
-function mockRequest(body: unknown, token?: string) {
+function setupUpdateSuccess() {
+  mockSet.mockReturnValue({ where: () => Promise.resolve(undefined) });
+}
+
+function setupSelectReturn(result: unknown[]) {
+  mockOrderBy.mockImplementation(() =>
+    Promise.resolve(result)
+  );
+  mockLimit.mockImplementation(() =>
+    Promise.resolve(result)
+  );
+  mockWhere.mockImplementation(() => ({
+    limit: mockLimit,
+    orderBy: mockOrderBy,
+  }));
+  mockFrom.mockReturnValue({ where: mockWhere });
+  mockSelect.mockReturnValue({ from: mockFrom });
+}
+
+function mockRequest(body: unknown) {
   const req = new Request("http://localhost/api/telegram/webhook", {
     method: "POST",
     body: JSON.stringify(body),
     headers: { "content-type": "application/json" },
   });
-  return Object.assign(req, { nextUrl: new URL("http://localhost/api/telegram/webhook") }) as any;
+  return Object.assign(req, { nextUrl: new URL("http://localhost/api/telegram/webhook") });
 }
 
 function makeCallbackQuery(overrides: Partial<{ data: string; id: string }>) {
@@ -33,7 +58,9 @@ function makeCallbackQuery(overrides: Partial<{ data: string; id: string }>) {
 
 describe("POST /api/telegram/webhook", () => {
   beforeEach(() => {
+    vi.resetAllMocks();
     vi.stubEnv("TELEGRAM_BOT_TOKEN", "test:token");
+    setupUpdateSuccess();
   });
 
   it("returns 200 when no callback_query", async () => {
@@ -42,7 +69,9 @@ describe("POST /api/telegram/webhook", () => {
     expect(response.status).toBe(200);
   });
 
-  it("processes done action and answers callback", async () => {
+  it("processes done action, edits message, and answers callback", async () => {
+    setupSelectReturn([{ id: 1, date: "2026-05-14", title: "Fix gateway", is_urgent: true, status: "done", created_at: new Date() }]);
+
     const mockFetch = vi.fn().mockResolvedValue({ ok: true });
     vi.stubGlobal("fetch", mockFetch);
 
@@ -50,14 +79,15 @@ describe("POST /api/telegram/webhook", () => {
     const response = await POST(mockRequest(makeCallbackQuery({ data: "todo:1:done" })));
 
     expect(response.status).toBe(200);
-    expect(mockFetch).toHaveBeenCalledTimes(1);
-    const callUrl = mockFetch.mock.calls[0][0];
-    expect(callUrl).toContain("answerCallbackQuery");
-    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
-    expect(body.text).toContain("done");
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+
+    expect(mockFetch.mock.calls[0][0]).toContain("editMessageText");
+    expect(mockFetch.mock.calls[1][0]).toContain("answerCallbackQuery");
   });
 
-  it("processes dismiss action and answers callback", async () => {
+  it("processes dismiss action, edits message, and answers callback", async () => {
+    setupSelectReturn([{ id: 2, date: "2026-05-14", title: "Some task", is_urgent: false, status: "dismissed", created_at: new Date() }]);
+
     const mockFetch = vi.fn().mockResolvedValue({ ok: true });
     vi.stubGlobal("fetch", mockFetch);
 
@@ -65,8 +95,9 @@ describe("POST /api/telegram/webhook", () => {
     const response = await POST(mockRequest(makeCallbackQuery({ data: "todo:2:dismiss" })));
 
     expect(response.status).toBe(200);
-    expect(mockFetch).toHaveBeenCalledTimes(1);
-    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(mockFetch.mock.calls[1][0]).toContain("answerCallbackQuery");
+    const body = JSON.parse(mockFetch.mock.calls[1][1].body);
     expect(body.text).toContain("Dismissed");
   });
 
@@ -84,7 +115,10 @@ describe("POST /api/telegram/webhook", () => {
   });
 
   it("handles errors gracefully", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("Network error")));
+    setupSelectReturn([{ id: 1, date: "2026-05-14", title: "Fix gateway", is_urgent: true, status: "done", created_at: new Date() }]);
+
+    const mockFetch = vi.fn().mockRejectedValue(new Error("Network error"));
+    vi.stubGlobal("fetch", mockFetch);
 
     const { POST } = await import("./route");
     const response = await POST(mockRequest(makeCallbackQuery({})));

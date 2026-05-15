@@ -26,7 +26,10 @@ vi.mock("./extract-todos", () => ({
 
 function setupSelect(result: unknown[]) {
   mockOrderBy.mockReturnValue(Promise.resolve(result));
-  mockWhere.mockReturnValue({ orderBy: mockOrderBy });
+  mockWhere.mockImplementation(() => ({
+    orderBy: mockOrderBy,
+    limit: () => Promise.resolve(result),
+  }));
   mockFrom.mockReturnValue({ where: mockWhere });
   mockSelect.mockReturnValue({ from: mockFrom });
 }
@@ -93,6 +96,29 @@ describe("todo-service", () => {
       const result = await getTodosForDate("2026-05-14");
 
       expect(result).toEqual([]);
+    });
+  });
+
+  describe("getTodoItem", () => {
+    it("returns item by id", async () => {
+      const item = { id: 1, date: "2026-05-14", title: "Test task", is_urgent: true, status: "pending", created_at: new Date() };
+      setupSelect([item]);
+
+      const { getTodoItem } = await import("./todo-service");
+      const result = await getTodoItem(1);
+
+      expect(result).not.toBeNull();
+      expect(result!.id).toBe(1);
+      expect(result!.title).toBe("Test task");
+    });
+
+    it("returns null when item not found", async () => {
+      setupSelect([]);
+
+      const { getTodoItem } = await import("./todo-service");
+      const result = await getTodoItem(999);
+
+      expect(result).toBeNull();
     });
   });
 
